@@ -5,6 +5,17 @@ import { ChangeEvent, FormEvent, useMemo, useState } from "react";
 type ReportType = "queja" | "sugerencia";
 
 const OWNER_WHATSAPP = "51957722135"; // Reemplazar con el número real, incluyendo el código de país.
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
+const ALLOWED_FILE_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "text/plain",
+]);
+const ALLOWED_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp", "pdf", "doc", "docx", "txt"]);
 
 const initialForm = {
   name: "",
@@ -46,13 +57,24 @@ export default function Home() {
   }
 
   function validate() {
+    if (!form.name.trim() || !form.room.trim() || !form.date || !form.time || !form.detail.trim()) {
+      setStatus("Complete todos los campos obligatorios antes de continuar.");
+      return false;
+    }
     if (!/^\d{8}$/.test(form.dni)) {
       setStatus("Ingrese un DNI válido de 8 dígitos.");
       return false;
     }
-    if (file && file.size > 10 * 1024 * 1024) {
-      setStatus("El archivo adjunto no debe superar los 10 MB.");
-      return false;
+    if (file) {
+      const extension = file.name.split(".").pop()?.toLowerCase() || "";
+      if (!ALLOWED_FILE_TYPES.has(file.type) || !ALLOWED_EXTENSIONS.has(extension)) {
+        setStatus("El tipo de archivo no está permitido. Use JPG, PNG, WEBP, PDF, DOC, DOCX o TXT.");
+        return false;
+      }
+      if (file.size > MAX_FILE_SIZE) {
+        setStatus("El archivo adjunto no debe superar los 10 MB.");
+        return false;
+      }
     }
     setStatus("");
     return true;
@@ -60,13 +82,13 @@ export default function Home() {
 
   function buildMessage(includePdfNote = false) {
     const attachment = file
-      ? `\n📎 Archivo seleccionado: ${file.name} (adjuntarlo en este chat)`
+      ? `\n📎 Archivo seleccionado: ${cleanText(file.name)} (adjuntarlo en este chat)`
       : "\n📎 Archivo adjunto: ninguno";
     const pdfNote = includePdfNote
       ? "\n\n📄 He generado el PDF con todos los datos. Lo adjuntaré a continuación."
       : "";
 
-    return `*HOSPEDAJE GOLDEN GATE*\n*${current.label.toUpperCase()}*\n\n👤 Nombre: ${form.name}\n🪪 DNI: ${form.dni}\n🚪 Habitación: ${form.room}\n📅 Fecha: ${formatDate(form.date)}\n🕐 Hora: ${form.time}\n\n📝 Detalle:\n${form.detail}${attachment}${pdfNote}`;
+    return `*HOSPEDAJE GOLDEN GATE*\n*${current.label.toUpperCase()}*\n\n👤 Nombre: ${cleanText(form.name)}\n🪪 DNI: ${form.dni}\n🚪 Habitación: ${cleanText(form.room)}\n📅 Fecha: ${formatDate(form.date)}\n🕐 Hora: ${form.time}\n\n📝 Detalle:\n${cleanText(form.detail)}${attachment}${pdfNote}`;
   }
 
   function openWhatsApp(message: string) {
@@ -131,12 +153,12 @@ export default function Home() {
     doc.setTextColor(40, 40, 40);
     doc.setFontSize(11);
     const rows = [
-      ["Nombre", form.name],
+      ["Nombre", cleanText(form.name)],
       ["DNI", form.dni],
-      ["Habitación", form.room],
+      ["Habitación", cleanText(form.room)],
       ["Fecha", formatDate(form.date)],
       ["Hora", form.time],
-      ["Archivo seleccionado", file?.name || "Ninguno"],
+      ["Archivo seleccionado", file ? cleanText(file.name) : "Ninguno"],
     ];
     let y = 78;
     rows.forEach(([label, value]) => {
@@ -152,7 +174,7 @@ export default function Home() {
     doc.setFont("helvetica", "bold");
     doc.text("Detalle", 18, y + 2);
     doc.setFont("helvetica", "normal");
-    const lines = doc.splitTextToSize(form.detail, 174);
+    const lines = doc.splitTextToSize(cleanText(form.detail), 174);
     doc.text(lines, 18, y + 11);
 
     if (file?.type.startsWith("image/")) {
@@ -297,7 +319,7 @@ export default function Home() {
             <div className="field-grid">
               <label>
                 <span>Nombre completo</span>
-                <input name="name" value={form.name} onChange={updateField} placeholder="Ej. María Fernández" required autoComplete="name" />
+                <input name="name" value={form.name} onChange={updateField} placeholder="Ej. María Fernández" required autoComplete="name" maxLength={100} />
               </label>
               <label>
                 <span>DNI</span>
@@ -305,7 +327,7 @@ export default function Home() {
               </label>
               <label>
                 <span>Número de habitación</span>
-                <input name="room" value={form.room} onChange={updateField} placeholder="Ej. 204" required />
+                <input name="room" value={form.room} onChange={updateField} placeholder="Ej. 204" required maxLength={20} />
               </label>
               <label>
                 <span>Fecha</span>
@@ -319,7 +341,7 @@ export default function Home() {
 
             <label className="detail-field">
               <span>Detalle de la {type}</span>
-              <textarea name="detail" value={form.detail} onChange={updateField} placeholder={current.placeholder} rows={6} required />
+              <textarea name="detail" value={form.detail} onChange={updateField} placeholder={current.placeholder} rows={6} required maxLength={2000} />
               <small>{form.detail.length} caracteres</small>
             </label>
 
@@ -419,6 +441,12 @@ function formatSize(bytes: number) {
   return bytes < 1024 * 1024
     ? `${Math.ceil(bytes / 1024)} KB`
     : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function cleanText(value: string) {
+  return value
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "")
+    .trim();
 }
 
 function readFileAsDataUrl(file: File) {
