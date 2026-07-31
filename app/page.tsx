@@ -20,6 +20,7 @@ export default function Home() {
   const [form, setForm] = useState(initialForm);
   const [file, setFile] = useState<File | null>(null);
   const [status, setStatus] = useState("");
+  const [showSuccess, setShowSuccess] = useState(false);
 
   const current = useMemo(
     () =>
@@ -88,6 +89,7 @@ export default function Home() {
           files: [file],
         });
         setStatus("Archivo y formulario preparados para compartir por WhatsApp.");
+        setShowSuccess(true);
         return;
       } catch (error) {
         if ((error as Error).name === "AbortError") return;
@@ -95,6 +97,7 @@ export default function Home() {
     }
 
     openWhatsApp(buildMessage());
+    setShowSuccess(true);
     setStatus(
       file
         ? "WhatsApp está listo. Por seguridad, adjunte allí el archivo seleccionado antes de enviar."
@@ -211,6 +214,7 @@ export default function Home() {
           files: [pdfFile],
         });
         setStatus("PDF preparado para compartir.");
+        setShowSuccess(true);
         return;
       } catch (error) {
         if ((error as Error).name === "AbortError") return;
@@ -219,6 +223,7 @@ export default function Home() {
 
     doc.save(pdfFile.name);
     openWhatsApp(buildMessage(true));
+    setShowSuccess(true);
     setStatus(
       "El PDF se descargó y WhatsApp está abierto. Adjunte el PDF descargado en el chat.",
     );
@@ -360,6 +365,42 @@ export default function Home() {
         <p>Gracias por ayudarnos a mejorar su experiencia.</p>
         <small>© {new Date().getFullYear()} Hospedaje Golden Gate · Libro de atención digital</small>
       </footer>
+
+      {showSuccess && (
+        <div className="success-overlay" role="presentation">
+          <section
+            className="success-card"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="success-title"
+          >
+            <button
+              className="success-close"
+              type="button"
+              aria-label="Cerrar mensaje"
+              onClick={() => setShowSuccess(false)}
+            >
+              ×
+            </button>
+            <div className="success-seal" aria-hidden="true">
+              <span>✓</span>
+            </div>
+            <p className="success-eyebrow">Hospedaje Golden Gate</p>
+            <h2 id="success-title">Mensaje enviado<br /><em>con éxito</em></h2>
+            <div className="success-line" />
+            <p className="success-copy">
+              Muchas gracias por ser parte de Hospedaje Golden Gate.
+            </p>
+            <button
+              className="success-action"
+              type="button"
+              onClick={() => setShowSuccess(false)}
+            >
+              Continuar
+            </button>
+          </section>
+        </div>
+      )}
     </main>
   );
 }
