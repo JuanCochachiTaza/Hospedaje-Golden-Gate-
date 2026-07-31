@@ -4,7 +4,7 @@ import { ChangeEvent, FormEvent, useMemo, useState } from "react";
 
 type ReportType = "queja" | "sugerencia";
 
-const OWNER_WHATSAPP = "51999999999"; // Reemplazar con el número real, incluyendo el código de país.
+const OWNER_WHATSAPP = "51957722135"; // Reemplazar con el número real, incluyendo el código de país.
 
 const initialForm = {
   name: "",
@@ -76,9 +76,24 @@ export default function Home() {
     );
   }
 
-  function sendText(event: FormEvent) {
+  async function sendText(event: FormEvent) {
     event.preventDefault();
     if (!validate()) return;
+
+    if (file && navigator.share && navigator.canShare?.({ files: [file] })) {
+      try {
+        await navigator.share({
+          title: `${current.label} - Hospedaje Golden Gate`,
+          text: buildMessage(),
+          files: [file],
+        });
+        setStatus("Archivo y formulario preparados para compartir por WhatsApp.");
+        return;
+      } catch (error) {
+        if ((error as Error).name === "AbortError") return;
+      }
+    }
+
     openWhatsApp(buildMessage());
     setStatus(
       file
@@ -125,7 +140,7 @@ export default function Home() {
       doc.setFont("helvetica", "bold");
       doc.text(`${label}:`, 18, y);
       doc.setFont("helvetica", "normal");
-      doc.text(value, 58, y);
+      doc.text(value, 70, y);
       doc.setDrawColor(226, 220, 207);
       doc.line(18, y + 4, 192, y + 4);
       y += 13;
@@ -136,6 +151,42 @@ export default function Home() {
     doc.setFont("helvetica", "normal");
     const lines = doc.splitTextToSize(form.detail, 174);
     doc.text(lines, 18, y + 11);
+
+    if (file?.type.startsWith("image/")) {
+      const dataUrl = await readFileAsDataUrl(file);
+      const dimensions = await getImageDimensions(dataUrl);
+      const maxWidth = 174;
+      const maxHeight = 105;
+      const scale = Math.min(
+        maxWidth / dimensions.width,
+        maxHeight / dimensions.height,
+        1,
+      );
+      const imageWidth = dimensions.width * scale;
+      const imageHeight = dimensions.height * scale;
+      let imageY = y + 18 + lines.length * 5;
+
+      if (imageY + imageHeight > 274) {
+        doc.addPage();
+        imageY = 30;
+        doc.setTextColor(40, 40, 40);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(11);
+        doc.text("Evidencia adjunta", 18, 20);
+      } else {
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(11);
+        doc.text("Evidencia adjunta", 18, imageY - 7);
+      }
+
+      const imageType = file.type.includes("png")
+        ? "PNG"
+        : file.type.includes("webp")
+          ? "WEBP"
+          : "JPEG";
+      doc.addImage(dataUrl, imageType, 18, imageY, imageWidth, imageHeight);
+    }
+
     doc.setFontSize(8.5);
     doc.setTextColor(110, 110, 110);
     doc.text(
@@ -327,4 +378,25 @@ function formatSize(bytes: number) {
   return bytes < 1024 * 1024
     ? `${Math.ceil(bytes / 1024)} KB`
     : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function readFileAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
+function getImageDimensions(source: string) {
+  return new Promise<{ width: number; height: number }>((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve({
+      width: image.naturalWidth,
+      height: image.naturalHeight,
+    });
+    image.onerror = reject;
+    image.src = source;
+  });
 }
