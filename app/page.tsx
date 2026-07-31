@@ -256,6 +256,10 @@ export default function Home() {
       <section className="hero">
         <div className="hero-orbit orbit-one" />
         <div className="hero-orbit orbit-two" />
+        <div className="hero-orbit orbit-three" />
+        <div className="hero-orbit orbit-four" />
+        <div className="hero-orbit orbit-five" />
+        <div className="orbit-glow" aria-hidden="true" />
         <nav className="nav-shell" aria-label="Navegación principal">
           <a className="brand" href="#inicio" aria-label="Golden Gate, inicio">
             <span className="brand-mark">GG</span>
