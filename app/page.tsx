@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, PointerEvent, useEffect, useMemo, useRef, useState } from "react";
 
 type ReportType = "queja" | "sugerencia";
 
@@ -32,6 +32,64 @@ export default function Home() {
   const [file, setFile] = useState<File | null>(null);
   const [status, setStatus] = useState("");
   const [showSuccess, setShowSuccess] = useState(false);
+  const [sensorPermissionNeeded, setSensorPermissionNeeded] = useState(false);
+  const [sensorActive, setSensorActive] = useState(false);
+  const titleRef = useRef<HTMLHeadingElement>(null);
+
+  function setTitleTilt(rotateX: number, rotateY: number) {
+    titleRef.current?.style.setProperty("--tilt-x", `${rotateX.toFixed(2)}deg`);
+    titleRef.current?.style.setProperty("--tilt-y", `${rotateY.toFixed(2)}deg`);
+  }
+
+  function handleOrientation(event: DeviceOrientationEvent) {
+    if (event.beta === null || event.gamma === null) return;
+    const rotateX = Math.max(-8, Math.min(8, (event.beta - 45) * -0.18));
+    const rotateY = Math.max(-11, Math.min(11, event.gamma * 0.24));
+    setTitleTilt(rotateX, rotateY);
+  }
+
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (typeof DeviceOrientationEvent === "undefined") return;
+    const orientationApi = DeviceOrientationEvent as typeof DeviceOrientationEvent & {
+      requestPermission?: () => Promise<"granted" | "denied">;
+    };
+
+    if (typeof orientationApi.requestPermission === "function") {
+      setSensorPermissionNeeded(true);
+      return () => window.removeEventListener("deviceorientation", handleOrientation, true);
+    }
+
+    window.addEventListener("deviceorientation", handleOrientation, true);
+    setSensorActive(true);
+    return () => window.removeEventListener("deviceorientation", handleOrientation, true);
+  }, []);
+
+  async function enableMotionSensor() {
+    const orientationApi = DeviceOrientationEvent as typeof DeviceOrientationEvent & {
+      requestPermission?: () => Promise<"granted" | "denied">;
+    };
+    if (!orientationApi.requestPermission) return;
+
+    try {
+      const permission = await orientationApi.requestPermission();
+      if (permission === "granted") {
+        window.addEventListener("deviceorientation", handleOrientation, true);
+        setSensorPermissionNeeded(false);
+        setSensorActive(true);
+      }
+    } catch {
+      setSensorPermissionNeeded(false);
+    }
+  }
+
+  function handlePointerTilt(event: PointerEvent<HTMLHeadingElement>) {
+    if (event.pointerType === "touch" || sensorActive) return;
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const horizontal = (event.clientX - bounds.left) / bounds.width - 0.5;
+    const vertical = (event.clientY - bounds.top) / bounds.height - 0.5;
+    setTitleTilt(vertical * -12, horizontal * 16);
+  }
 
   const current = useMemo(
     () =>
@@ -270,12 +328,24 @@ export default function Home() {
 
         <div className="hero-content" id="inicio">
           <p className="eyebrow"><span /> Su opinión nos importa</p>
-          <h1>Quejas y<br /><em>sugerencias</em></h1>
+          <h1
+            ref={titleRef}
+            className="hero-title-3d"
+            onPointerMove={handlePointerTilt}
+            onPointerLeave={() => !sensorActive && setTitleTilt(0, 0)}
+          >
+            Quejas y<br /><em>sugerencias</em>
+          </h1>
           <p className="hero-copy">
             Cada comentario es una oportunidad para brindarle una estadía más
             cómoda, cálida y memorable.
           </p>
           <a className="hero-cta" href="#formulario">Compartir mi experiencia <span>↓</span></a>
+          {sensorPermissionNeeded && (
+            <button className="motion-permission" type="button" onClick={enableMotionSensor}>
+              <span aria-hidden="true">✦</span> Activar efecto 3D
+            </button>
+          )}
         </div>
 
         <div className="hero-card" aria-label="Compromiso de atención">
